@@ -1,0 +1,59 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "合燃华润燃气配置",
+        "description": "输入您的燃气户号和户主手机号来添加集成。",
+        "data": {
+          "huhao": "户号（10位数字）",
+          "phone": "户主手机号"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "无法连接到合燃华润燃气服务器",
+      "invalid_huhao": "无效的户号，户号应为10位数字",
+      "invalid_phone": "无效的手机号",
+      "bind_failed": "户号绑定失败，请检查户号和手机号是否匹配",
+      "no_account": "未找到该户号的信息",
+      "unknown": "未知错误"
+    },
+    "abort": {
+      "already_configured": "该户号已经配置过"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "meter_reading": {
+        "name": "燃气表读数"
+      },
+      "yesterday_gas_usage": {
+        "name": "昨日用气量"
+      },
+      "monthly_gas_usage": {
+        "name": "本月累计用气量"
+      },
+      "yearly_gas_usage": {
+        "name": "年度出账用气量"
+      },
+      "latest_bill_usage": {
+        "name": "最近出账用气量"
+      },
+      "last_bill_amount": {
+        "name": "最近出账金额"
+      },
+      "last_bill_date": {
+        "name": "最近出账日期"
+      },
+      "balance": {
+        "name": "账户余额"
+      },
+      "last_payment_amount": {
+        "name": "最近缴费金额"
+      },
+      "next_update_time": {
+        "name": "下次轮询时间"
+      }
+    }
+  }
+}
