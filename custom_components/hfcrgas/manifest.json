@@ -8,5 +8,5 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/Cyborg2017/ha_hfcrgas/issues",
   "requirements": ["pycryptodome>=3.19.0"],
-  "version": "26.4.0"
+  "version": "26.4.1"
 }
