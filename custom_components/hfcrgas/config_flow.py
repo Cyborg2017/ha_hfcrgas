@@ -69,7 +69,7 @@ class HFCRGasConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 await api.close()
 
                 return self.async_create_entry(
-                    title=f"合燃华润燃气 {huhao}",
+                    title="合燃华润燃气",
                     data=data,
                 )
 

@@ -140,23 +140,29 @@ class HFCRGasSensorEntity(CoordinatorEntity[HFCRGasCoordinator], SensorEntity):
         """初始化传感器."""
         super().__init__(coordinator)
         self.entity_description = description
-        self._attr_unique_id = f"{huhao}_{description.key}"
-        # 设备名称：用户名称 | 地址
+        self._attr_unique_id = f"hfcrgas_{huhao}_{description.key}"
+
+        # 设备名称：地址
+        address = coordinator.api.address or "未知地址"
+        # 型号：用户名 - 户号
         user_name = coordinator.api.user_name or ""
-        address = coordinator.api.address or ""
-        if user_name and address:
-            device_name = f"{user_name} | {address}"
-        elif user_name:
-            device_name = user_name
-        elif address:
-            device_name = address
-        else:
-            device_name = f"合燃华润燃气 {huhao}"
+        model = f"{user_name} - {huhao}" if user_name else huhao
+
+        # 从 manifest.json 读取版本号
+        import json
+        from pathlib import Path
+        manifest_path = Path(__file__).parent / "manifest.json"
+        try:
+            sw_version = json.loads(manifest_path.read_text(encoding="utf-8")).get("version", "unknown")
+        except Exception:
+            sw_version = "unknown"
+
         self._attr_device_info = {
             "identifiers": {(DOMAIN, huhao)},
-            "name": device_name,
-            "manufacturer": "合燃华润燃气",
-            "model": coordinator.api.meter_type or "燃气表",
+            "name": address,
+            "manufacturer": "合肥华润燃气",
+            "model": model,
+            "sw_version": sw_version,
         }
         self.huhao = huhao
 
