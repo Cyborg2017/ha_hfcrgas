@@ -164,6 +164,9 @@ class HFCRGasSensorEntity(CoordinatorEntity[HFCRGasCoordinator], SensorEntity):
             "model": model,
             "sw_version": sw_version,
         }
+
+        # 手动设置 entity ID，避免中文地址转拼音导致 ID 过长
+        self.entity_id = f"sensor.hfcrgas_{huhao}_{description.key}"
         self.huhao = huhao
 
     @property
