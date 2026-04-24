@@ -121,6 +121,14 @@ SENSOR_DESCRIPTIONS: list[HFCRGasSensorEntityDescription] = [
             if data.get("next_update_time") else None
         ),
     ),
+    HFCRGasSensorEntityDescription(
+        key="daily_gas_usage_30d",
+        translation_key="daily_gas_usage_30d",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        icon="mdi:chart-bar",
+        value_fn=lambda data: data.get("total_30d"),
+    ),
 ]
 
 
@@ -256,6 +264,24 @@ class HFCRGasSensorEntity(CoordinatorEntity[HFCRGasCoordinator], SensorEntity):
 
         elif self.entity_description.key == "last_payment_amount":
             attrs["缴费日期"] = data.get("last_payment_date")
+
+        elif self.entity_description.key == "daily_gas_usage_30d":
+            daily_30d = data.get("daily_30d", [])
+            if daily_30d:
+                attrs["daylist"] = daily_30d
+                attrs["30天总用气量"] = data.get("total_30d", 0)
+                attrs["30天日均用气量"] = data.get("avg_30d", 0)
+                attrs["用户名"] = data.get("user_name")
+                attrs["地址"] = data.get("address")
+                attrs["户号"] = data.get("huhao")
+                attrs["余额"] = data.get("balance")
+                attrs["本月用气量"] = data.get("monthly_usage")
+                attrs["昨日用气量"] = data.get("yesterday_usage")
+                attrs["表读数"] = data.get("meter_reading")
+                attrs["最近出账日期"] = data.get("last_bill_date")
+                attrs["最近出账用气量"] = data.get("current_period_usage")
+                attrs["最近出账金额"] = data.get("last_bill_amount")
+                attrs["年度出账用气量"] = data.get("yearly_usage")
 
         return attrs
 

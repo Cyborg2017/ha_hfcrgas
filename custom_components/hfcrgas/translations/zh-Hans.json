@@ -53,6 +53,9 @@
       },
       "next_update_time": {
         "name": "下次轮询时间"
+      },
+      "daily_gas_usage_30d": {
+        "name": "30天用气量"
       }
     }
   }

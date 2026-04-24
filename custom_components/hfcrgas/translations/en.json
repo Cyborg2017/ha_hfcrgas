@@ -53,6 +53,9 @@
       },
       "next_update_time": {
         "name": "Next Update Time"
+      },
+      "daily_gas_usage_30d": {
+        "name": "30-Day Gas Usage"
       }
     }
   }
