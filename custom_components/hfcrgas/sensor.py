@@ -19,6 +19,15 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+# 模块级别读取版本号（避免在事件循环中执行阻塞 I/O）
+import json
+from pathlib import Path
+try:
+    _MANIFEST = json.loads((Path(__file__).parent / "manifest.json").read_text(encoding="utf-8"))
+    _VERSION = _MANIFEST.get("version", "unknown")
+except Exception:
+    _VERSION = "unknown"
+
 from .const import DOMAIN
 from .coordinator import HFCRGasCoordinator
 
@@ -157,13 +166,7 @@ class HFCRGasSensorEntity(CoordinatorEntity[HFCRGasCoordinator], SensorEntity):
         model = f"{user_name} - {huhao}" if user_name else huhao
 
         # 从 manifest.json 读取版本号
-        import json
-        from pathlib import Path
-        manifest_path = Path(__file__).parent / "manifest.json"
-        try:
-            sw_version = json.loads(manifest_path.read_text(encoding="utf-8")).get("version", "unknown")
-        except Exception:
-            sw_version = "unknown"
+        sw_version = _VERSION
 
         self._attr_device_info = {
             "identifiers": {(DOMAIN, huhao)},
