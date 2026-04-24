@@ -816,3 +816,12 @@ window.customCards.push({
   description: "显示30天燃气用量图表和用气日历的卡片",
   documentationURL: "https://github.com/Cyborg2017/ha_hfcrgas",
 });
+
+// 通知 HA 前端重新渲染，解决刷新后 "Custom element doesn't exist" 问题
+if (window.customCards && window.customCards.length > 0) {
+  window.dispatchEvent(new CustomEvent("custom-cards-updated", { bubbles: true }));
+  // 延迟再次通知，确保 HA 前端已完全加载
+  setTimeout(() => {
+    window.dispatchEvent(new CustomEvent("custom-cards-updated", { bubbles: true }));
+  }, 1000);
+}

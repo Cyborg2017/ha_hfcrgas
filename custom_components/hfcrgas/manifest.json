@@ -3,6 +3,7 @@
   "name": "合燃华润燃气",
   "codeowners": [],
   "config_flow": true,
+  "dependencies": ["frontend", "http"],
   "documentation": "https://github.com/Cyborg2017/ha_hfcrgas",
   "integration_type": "device",
   "iot_class": "cloud_polling",
