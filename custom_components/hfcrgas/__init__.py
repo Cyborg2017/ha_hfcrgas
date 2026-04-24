@@ -5,6 +5,8 @@ from __future__ import annotations
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.components.http import StaticPathConfig
+from homeassistant.components.frontend import add_extra_js_url
 
 from .api import HFCRGasAPI
 from .const import DOMAIN
@@ -13,6 +15,21 @@ from .coordinator import HFCRGasCoordinator
 PLATFORMS = [Platform.SENSOR]
 
 type HFCRGasConfigEntry = ConfigEntry[HFCRGasCoordinator]
+
+
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """组件初始化时注册前端卡片资源."""
+    await _register_frontend_card(hass)
+    return True
+
+
+async def _register_frontend_card(hass: HomeAssistant) -> None:
+    """注册前端卡片资源."""
+    card_path = "/hfcrgas-local"
+    await hass.http.async_register_static_paths([
+        StaticPathConfig(card_path, hass.config.path("custom_components/hfcrgas/www"), False)
+    ])
+    add_extra_js_url(hass, f"{card_path}/hfcrgas-card.js")
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
