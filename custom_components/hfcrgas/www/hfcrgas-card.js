@@ -115,7 +115,9 @@ class HFCRGasCard extends LitElement {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 16px 20px 8px;
+        padding: 16px 20px 12px;
+        border-bottom: 2px solid transparent;
+        border-image: linear-gradient(90deg, #FF6D00, #FF9800, #FFC107, transparent) 1;
       }
       .card-title {
         font-size: 18px;
@@ -123,13 +125,14 @@ class HFCRGasCard extends LitElement {
         color: var(--primary-text-color);
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 10px;
       }
       .card-title img.card-logo {
-        width: 28px;
-        height: 28px;
-        border-radius: 4px;
+        width: 30px;
+        height: 30px;
+        border-radius: 6px;
         object-fit: contain;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.12);
       }
       .card-subtitle {
         font-size: 12px;
@@ -137,27 +140,46 @@ class HFCRGasCard extends LitElement {
         margin-top: 2px;
       }
       .summary-row {
-        display: flex;
-        justify-content: space-around;
-        padding: 12px 16px;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        padding: 12px 12px;
         gap: 8px;
       }
       .summary-item {
         text-align: center;
         flex: 1;
+        background: var(--secondary-background-color, rgba(0,0,0,0.03));
+        border-radius: 10px;
+        padding: 10px 4px 8px;
+        transition: transform 0.15s, box-shadow 0.15s;
+      }
+      .summary-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+      }
+      .summary-icon {
+        margin-bottom: 4px;
+      }
+      .summary-icon ha-icon {
+        --mdi-icon-size: 20px;
+        color: var(--secondary-text-color, #999);
       }
       .summary-value {
-        font-size: 20px;
+        font-size: 18px;
         font-weight: bold;
         color: var(--primary-text-color);
+        line-height: 1.3;
       }
       .summary-value.orange { color: #FF6D00; }
       .summary-value.blue { color: #1E88E5; }
       .summary-value.green { color: #43A047; }
       .summary-label {
-        font-size: 11px;
+        font-size: 10px;
         color: var(--secondary-text-color, #999);
         margin-top: 2px;
+        letter-spacing: 0.3px;
+        line-height: 1.3;
+        word-break: keep-all;
       }
       .chart-section {
         padding: 4px 12px 12px;
@@ -183,12 +205,23 @@ class HFCRGasCard extends LitElement {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 8px 20px;
+        padding: 9px 20px;
         border-top: 1px solid var(--divider-color, #eee);
         font-size: 13px;
+        transition: background 0.15s;
+      }
+      .info-row:hover {
+        background: var(--secondary-background-color, rgba(0,0,0,0.02));
       }
       .info-label {
         color: var(--secondary-text-color, #999);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .info-label ha-icon {
+        --mdi-icon-size: 16px;
+        color: #FF9800;
       }
       .info-value {
         color: var(--primary-text-color);
@@ -687,6 +720,8 @@ class HFCRGasCard extends LitElement {
       }
     }
 
+    const isCurrentMonth = this._calYear === new Date().getFullYear() && this._calMonth === new Date().getMonth() + 1;
+
     return html`
       <div class="calendar-grid">
         <!-- 导航行 -->
@@ -694,7 +729,7 @@ class HFCRGasCard extends LitElement {
           <div class="cal-nav-btn" @click=${() => this._prevMonth()}>◀</div>
           <div class="cal-year-month">${this._calYear}年${this._calMonth}月</div>
           <div class="cal-nav-btn" @click=${() => this._nextMonth()}>▶</div>
-          <div class="cal-today-btn" @click=${() => this._goToToday()}>今月</div>
+          <div class="cal-today-btn" @click=${() => this._goToToday()}>${isCurrentMonth ? "当前月" : "返回本月"}</div>
         </div>
 
         <!-- 星期表头 -->
@@ -748,20 +783,24 @@ class HFCRGasCard extends LitElement {
 
         <div class="summary-row">
           <div class="summary-item">
+            <div class="summary-icon"><ha-icon icon="mdi:gas-burner"></ha-icon></div>
             <div class="summary-value orange">${typeof yesterdayUsage === "number" ? yesterdayUsage.toFixed(2) : yesterdayUsage}</div>
-            <div class="summary-label">昨日用气(m³)</div>
+            <div class="summary-label">昨日用气<br>(m³)</div>
           </div>
           <div class="summary-item">
+            <div class="summary-icon"><ha-icon icon="mdi:chart-line"></ha-icon></div>
             <div class="summary-value blue">${typeof monthlyUsage === "number" ? monthlyUsage.toFixed(2) : monthlyUsage}</div>
-            <div class="summary-label">本月用气(m³)</div>
+            <div class="summary-label">本月用气<br>(m³)</div>
           </div>
           <div class="summary-item">
+            <div class="summary-icon"><ha-icon icon="mdi:wallet"></ha-icon></div>
             <div class="summary-value green">${typeof balance === "number" ? balance.toFixed(2) : balance}</div>
-            <div class="summary-label">余额(元)</div>
+            <div class="summary-label">账户余额<br>(元)</div>
           </div>
           <div class="summary-item">
+            <div class="summary-icon"><ha-icon icon="mdi:gauge"></ha-icon></div>
             <div class="summary-value" style="color:var(--primary-text-color)">${typeof meterReading === "number" ? meterReading.toFixed(2) : meterReading}</div>
-            <div class="summary-label">表读数(m³)</div>
+            <div class="summary-label">气表读数<br>(m³)</div>
           </div>
         </div>
 
@@ -785,19 +824,19 @@ class HFCRGasCard extends LitElement {
         ${this._showCalendar ? this._renderCalendar() : ""}
 
         <div class="info-row">
-          <span class="info-label">最近出账日期</span>
+          <span class="info-label"><ha-icon icon="mdi:calendar-clock"></ha-icon> 最近出账日期</span>
           <span class="info-value">${lastBillDate || "-"}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">最近出账用气量</span>
+          <span class="info-label"><ha-icon icon="mdi:gas-burner"></ha-icon> 最近出账用气量</span>
           <span class="info-value">${typeof lastBillUsage === "number" ? lastBillUsage.toFixed(2) + " m³" : lastBillUsage}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">年度出账用气量</span>
+          <span class="info-label"><ha-icon icon="mdi:chart-box"></ha-icon> 年度出账用气量</span>
           <span class="info-value">${typeof yearlyUsage === "number" ? yearlyUsage.toFixed(2) + " m³" : yearlyUsage}</span>
         </div>
         <div class="info-row">
-          <span class="info-label">最近出账金额</span>
+          <span class="info-label"><ha-icon icon="mdi:currency-cny"></ha-icon> 最近出账金额</span>
           <span class="info-value">${typeof lastBillAmount === "number" ? lastBillAmount.toFixed(2) + " 元" : lastBillAmount}</span>
         </div>
       </ha-card>
