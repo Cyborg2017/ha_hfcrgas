@@ -732,9 +732,6 @@ class HFCRGasCard extends LitElement {
     const lastBillUsage = attrs["最近出账用气量"] ?? "-";
     const lastBillAmount = attrs["最近出账金额"] ?? "-";
     const yearlyUsage = attrs["年度出账用气量"] ?? "-";
-    const userName = attrs["用户名"] || "";
-    const address = attrs["地址"] || "";
-
     return html`
       <ha-card>
         <div class="card-header">
@@ -743,9 +740,6 @@ class HFCRGasCard extends LitElement {
               <ha-icon icon="mdi:fire"></ha-icon>
               ${this.config.title || "合燃华润燃气"}
             </div>
-            ${userName || address
-              ? html`<div class="card-subtitle">${userName}${userName && address ? " · " : ""}${address}</div>`
-              : ""}
           </div>
         </div>
 
