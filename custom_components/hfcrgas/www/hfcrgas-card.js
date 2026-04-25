@@ -125,8 +125,11 @@ class HFCRGasCard extends LitElement {
         align-items: center;
         gap: 8px;
       }
-      .card-title ha-icon {
-        color: #FF6D00;
+      .card-title img.card-logo {
+        width: 28px;
+        height: 28px;
+        border-radius: 4px;
+        object-fit: contain;
       }
       .card-subtitle {
         font-size: 12px;
@@ -737,7 +740,7 @@ class HFCRGasCard extends LitElement {
         <div class="card-header">
           <div>
             <div class="card-title">
-              <ha-icon icon="mdi:fire"></ha-icon>
+              <img class="card-logo" src="/hfcrgas-local/logo.png" alt="logo">
               ${this.config.title || "合燃华润燃气"}
             </div>
           </div>
