@@ -48,6 +48,15 @@
       "balance": {
         "name": "账户余额"
       },
+      "cumulative_water": {
+        "name": "本年度累计用气量"
+      },
+      "tier1_surplus": {
+        "name": "第一阶梯剩余额度"
+      },
+      "tier2_surplus": {
+        "name": "第二阶梯剩余额度"
+      },
       "last_payment_amount": {
         "name": "最近缴费金额"
       },

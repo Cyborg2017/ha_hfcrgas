@@ -113,6 +113,33 @@ SENSOR_DESCRIPTIONS: list[HFCRGasSensorEntityDescription] = [
         value_fn=lambda data: data.get("balance"),
     ),
     HFCRGasSensorEntityDescription(
+        key="cumulative_water",
+        translation_key="cumulative_water",
+        device_class=SensorDeviceClass.GAS,
+        state_class=SensorStateClass.TOTAL,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        icon="mdi:chart-timeline-variant",
+        value_fn=lambda data: data.get("cumulative_water"),
+    ),
+    HFCRGasSensorEntityDescription(
+        key="tier1_surplus",
+        translation_key="tier1_surplus",
+        device_class=SensorDeviceClass.GAS,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        icon="mdi:numeric-1-box-multiple",
+        value_fn=lambda data: data.get("tier1_surplus"),
+    ),
+    HFCRGasSensorEntityDescription(
+        key="tier2_surplus",
+        translation_key="tier2_surplus",
+        device_class=SensorDeviceClass.GAS,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        icon="mdi:numeric-2-box-multiple",
+        value_fn=lambda data: data.get("tier2_surplus"),
+    ),
+    HFCRGasSensorEntityDescription(
         key="last_payment_amount",
         translation_key="last_payment_amount",
         device_class=SensorDeviceClass.MONETARY,
@@ -285,6 +312,10 @@ class HFCRGasSensorEntity(CoordinatorEntity[HFCRGasCoordinator], SensorEntity):
                 attrs["最近出账用气量"] = data.get("current_period_usage")
                 attrs["最近出账金额"] = data.get("last_bill_amount")
                 attrs["年度出账用气量"] = data.get("yearly_usage")
+                # 添加阶梯气量信息
+                attrs["本年度累计用气量"] = data.get("cumulative_water")
+                attrs["第一阶梯剩余额度"] = data.get("tier1_surplus")
+                attrs["第二阶梯剩余额度"] = data.get("tier2_surplus")
 
         return attrs
 

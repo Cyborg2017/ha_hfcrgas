@@ -48,6 +48,15 @@
       "balance": {
         "name": "Balance"
       },
+      "cumulative_water": {
+        "name": "Yearly Cumulative Gas Usage"
+      },
+      "tier1_surplus": {
+        "name": "Tier 1 Remaining Quota"
+      },
+      "tier2_surplus": {
+        "name": "Tier 2 Remaining Quota"
+      },
       "last_payment_amount": {
         "name": "Latest Payment Amount"
       },

@@ -387,6 +387,27 @@ class HFCRGasAPI:
         result = await self._request_with_retry("/query/getSurplus", data)
         return result.get("data", {})
 
+    async def get_arrears(self) -> float:
+        """获取欠费金额."""
+        await self._ensure_session_valid()
+
+        data = {
+            "yhh": self.encrypted_yhh,
+            "resourceIdentifier": self.resource_identifier,
+        }
+
+        try:
+            result = await self._request_with_retry("/query/getQianfei", data)
+            if result.get("status") == 200 and result.get("data"):
+                arrears_data = result["data"]
+                if isinstance(arrears_data, dict):
+                    zong_qianfei = arrears_data.get("zongQianfei", 0)
+                    return float(zong_qianfei)
+        except (HFCRGasAPIError, ValueError, TypeError) as err:
+            _LOGGER.debug("获取欠费金额失败: %s", err)
+
+        return 0.0
+
     async def _init_meter_info(self) -> None:
         """初始化表信息（表号、类型等）.
 
@@ -545,6 +566,48 @@ class HFCRGasAPI:
 
         return 0.0
 
+    async def get_tier_info(self) -> dict[str, Any]:
+        """获取阶梯气量详细信息.
+        
+        返回包含：
+        - cumulative_water: 本年度累计用气量
+        - tier1_surplus: 第一阶梯剩余额度
+        - tier2_surplus: 第二阶梯剩余额度
+        - current_tier: 当前所在阶梯
+        - tier_details: 各阶梯详细信息
+        """
+        await self._ensure_session_valid()
+
+        # 获取本年度累计用气量
+        yearly_usage = await self.get_yearly_usage()
+
+        # 合肥燃气阶梯标准（年度）
+        TIER1_LIMIT = 360  # 第一阶梯上限
+        TIER2_LIMIT = 1680  # 第二阶梯上限
+
+        # 计算各阶梯剩余额度
+        if yearly_usage < TIER1_LIMIT:
+            tier1_surplus = TIER1_LIMIT - yearly_usage
+            tier2_surplus = TIER2_LIMIT - TIER1_LIMIT  # 第二阶梯总额度
+            current_tier = 1
+        elif yearly_usage < TIER2_LIMIT:
+            tier1_surplus = 0
+            tier2_surplus = TIER2_LIMIT - yearly_usage
+            current_tier = 2
+        else:
+            tier1_surplus = 0
+            tier2_surplus = 0
+            current_tier = 3
+
+        return {
+            "cumulative_water": yearly_usage,
+            "tier1_surplus": tier1_surplus,
+            "tier2_surplus": tier2_surplus,
+            "current_tier": current_tier,
+            "tier1_limit": TIER1_LIMIT,
+            "tier2_limit": TIER2_LIMIT,
+        }
+
     async def _safe_call(self, coro):
         """安全调用协程，捕获异常."""
         try:
@@ -597,13 +660,15 @@ class HFCRGasAPI:
             await self._init_meter_info()
 
         # 并行获取所有数据（与 hfgas 参考实现一致）
-        daily_result, bill_result, user_info_result, surplus_result, yearly_result, payment_result = await asyncio.gather(
+        daily_result, bill_result, user_info_result, surplus_result, yearly_result, payment_result, arrears_result, tier_info_result = await asyncio.gather(
             self._safe_call(self.get_daily_usage()),
             self._safe_call(self.get_bill_list()),
             self._safe_call(self.get_user_info()),
             self._safe_call(self.get_surplus()),
             self._safe_call(self.get_yearly_usage()),
             self._safe_call(self.get_last_payment()),
+            self._safe_call(self.get_arrears()),
+            self._safe_call(self.get_tier_info()),
             return_exceptions=True,
         )
 
@@ -628,6 +693,19 @@ class HFCRGasAPI:
 
         # 处理最近缴费
         last_payment = payment_result if isinstance(payment_result, dict) else {"amount": 0.0, "date": None}
+
+        # 处理欠费金额
+        arrears_amount = arrears_result if isinstance(arrears_result, (int, float)) else 0.0
+
+        # 处理阶梯气量信息
+        tier_info = tier_info_result if isinstance(tier_info_result, dict) else {
+            "cumulative_water": yearly_usage,
+            "tier1_surplus": 0,
+            "tier2_surplus": 0,
+            "current_tier": 1,
+            "tier1_limit": 360,
+            "tier2_limit": 1680,
+        }
 
         # 解析日用量数据（燃气第二天更新前一天数据，所以最新一条就是昨日用气量）
         yesterday_usage = 0.0
@@ -705,11 +783,16 @@ class HFCRGasAPI:
             except (ValueError, TypeError):
                 pass
 
+        # 如果有欠费，账户余额显示为负数
+        if arrears_amount > 0:
+            balance = -arrears_amount
+            _LOGGER.info("检测到欠费 %.2f 元，账户余额设置为: %.2f", arrears_amount, balance)
+
         _LOGGER.info(
             "数据汇总: yesterday=%.2f, monthly=%.2f, yearly=%.2f, "
-            "meter_reading=%.2f, balance=%.2f, latest_bill_usage=%.2f",
+            "meter_reading=%.2f, balance=%.2f, latest_bill_usage=%.2f, arrears=%.2f, tier=%d",
             yesterday_usage, monthly_usage, yearly_usage,
-            meter_reading, balance, current_period_usage
+            meter_reading, balance, current_period_usage, arrears_amount, tier_info.get("current_tier", 1)
         )
 
         # 处理30天日用量结构化数据（供前端卡片使用）
@@ -763,6 +846,12 @@ class HFCRGasAPI:
             "last_bill_ym": last_bill_ym,
             "current_period_usage": current_period_usage,
             "balance": balance,
+            "cumulative_water": tier_info.get("cumulative_water", 0),
+            "tier1_surplus": tier_info.get("tier1_surplus", 0),
+            "tier2_surplus": tier_info.get("tier2_surplus", 0),
+            "current_tier": tier_info.get("current_tier", 1),
+            "tier1_limit": tier_info.get("tier1_limit", 360),
+            "tier2_limit": tier_info.get("tier2_limit", 1680),
             "last_payment_amount": last_payment.get("amount", 0.0),
             "last_payment_date": last_payment.get("date"),
             "daily_data": daily_data,

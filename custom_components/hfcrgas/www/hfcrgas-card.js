@@ -95,6 +95,7 @@ class HFCRGasCard extends LitElement {
       config: { type: Object },
       _chart: { type: Object },
       _showCalendar: { type: Boolean },
+      _showTierGas: { type: Boolean },
     };
   }
 
@@ -379,6 +380,84 @@ class HFCRGasCard extends LitElement {
         color: #FF6D00;
         font-weight: 600;
       }
+
+      /* 阶梯气量区域 */
+      .tier-section {
+        padding: 4px 16px 16px;
+      }
+      .tier-title {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--primary-text-color);
+        padding: 8px 4px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .tier-title ha-icon {
+        --mdi-icon-size: 16px;
+        color: #FF6D00;
+      }
+      .tier-item {
+        background: var(--secondary-background-color, rgba(0,0,0,0.03));
+        border-radius: 10px;
+        padding: 12px 14px;
+        margin-bottom: 10px;
+      }
+      .tier-item:last-child {
+        margin-bottom: 0;
+      }
+      .tier-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      .tier-name {
+        font-size: 14px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .tier-name.green { color: #43A047; }
+      .tier-name.yellow { color: #FFA726; }
+      .tier-name.red { color: #EF5350; }
+      .tier-volume {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--primary-text-color);
+      }
+      .tier-bar {
+        height: 8px;
+        background: #E0E0E0;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-bottom: 6px;
+      }
+      .tier-bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.3s ease;
+      }
+      .tier-bar-fill.green { background: linear-gradient(90deg, #66BB6A, #43A047); }
+      .tier-bar-fill.yellow { background: linear-gradient(90deg, #FFB74D, #FFA726); }
+      .tier-bar-fill.red { background: linear-gradient(90deg, #EF5350, #E53935); }
+      .tier-info {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: var(--secondary-text-color, #999);
+      }
+      .tier-tip {
+        background: linear-gradient(135deg, #FFF3E0, #FFE0B2);
+        border-left: 3px solid #FF6D00;
+        border-radius: 6px;
+        padding: 10px 12px;
+        margin-top: 12px;
+        font-size: 12px;
+        color: #E65100;
+      }
     `;
   }
 
@@ -388,6 +467,7 @@ class HFCRGasCard extends LitElement {
     this._resizeObserver = null;
     this._lastDaylistHash = null;
     this._showCalendar = false;
+    this._showTierGas = false;
     this._calYear = new Date().getFullYear();
     this._calMonth = new Date().getMonth() + 1;
   }
@@ -671,6 +751,95 @@ class HFCRGasCard extends LitElement {
     }
   }
 
+  _toggleTierGas() {
+    this._showTierGas = !this._showTierGas;
+  }
+
+  _renderTierGas(cumulativeWater, tier1Surplus, tier2Surplus) {
+    // 合肥燃气阶梯标准
+    const TIER1_LIMIT = 360;
+    const TIER2_LIMIT = 1680;
+    
+    // 计算各阶梯已用量
+    const tier1Used = Math.min(cumulativeWater, TIER1_LIMIT);
+    const tier2Used = cumulativeWater > TIER1_LIMIT ? Math.min(cumulativeWater - TIER1_LIMIT, TIER2_LIMIT - TIER1_LIMIT) : 0;
+    const tier3Used = cumulativeWater > TIER2_LIMIT ? cumulativeWater - TIER2_LIMIT : 0;
+    
+    // 确定当前阶梯
+    let currentTier = 1;
+    if (cumulativeWater > TIER2_LIMIT) {
+      currentTier = 3;
+    } else if (cumulativeWater > TIER1_LIMIT) {
+      currentTier = 2;
+    }
+    
+    // 单价
+    const tier1Price = 3.02;
+    const tier2Price = 3.32;
+    const tier3Price = 4.53;
+    
+    return html`
+      <div class="tier-section">
+        <div class="tier-title">
+          <ha-icon icon="mdi:gas-cylinder"></ha-icon>
+          阶梯气量详情
+        </div>
+
+        <!-- 第一阶梯 -->
+        <div class="tier-item">
+          <div class="tier-header">
+            <span class="tier-name green">🟢 第一阶梯</span>
+            <span class="tier-volume">${cumulativeWater.toFixed(0)} / ${TIER1_LIMIT} m³</span>
+          </div>
+          <div class="tier-bar">
+            <div class="tier-bar-fill green" style="width: ${(tier1Used / TIER1_LIMIT) * 100}%"></div>
+          </div>
+          <div class="tier-info">
+            <span>剩余: ${tier1Surplus.toFixed(0)} m³</span>
+            <span>单价: ${tier1Price.toFixed(2)} 元/m³</span>
+            <span>阶梯气费: ${(tier1Used * tier1Price).toFixed(2)} 元</span>
+          </div>
+        </div>
+
+        <!-- 第二阶梯 -->
+        <div class="tier-item">
+          <div class="tier-header">
+            <span class="tier-name yellow">🟡 第二阶梯</span>
+            <span class="tier-volume">${tier2Used > 0 ? tier2Used.toFixed(0) : '未使用'} / ${TIER2_LIMIT - TIER1_LIMIT} m³</span>
+          </div>
+          <div class="tier-bar">
+            <div class="tier-bar-fill yellow" style="width: ${tier2Used > 0 ? (tier2Used / (TIER2_LIMIT - TIER1_LIMIT)) * 100 : 0}%"></div>
+          </div>
+          <div class="tier-info">
+            <span>剩余: ${tier2Surplus.toFixed(0)} m³</span>
+            <span>单价: ${tier2Price.toFixed(2)} 元/m³</span>
+            <span>阶梯气费: ${(tier2Used * tier2Price).toFixed(2)} 元</span>
+          </div>
+        </div>
+
+        <!-- 第三阶梯 -->
+        <div class="tier-item">
+          <div class="tier-header">
+            <span class="tier-name red">🔴 第三阶梯</span>
+            <span class="tier-volume">${tier3Used > 0 ? tier3Used.toFixed(0) + ' m³' : '未使用'}</span>
+          </div>
+          <div class="tier-bar">
+            <div class="tier-bar-fill red" style="width: ${tier3Used > 0 ? Math.min((tier3Used / 500) * 100, 100) : 0}%"></div>
+          </div>
+          <div class="tier-info">
+            <span>${TIER2_LIMIT}m³以上</span>
+            <span>单价: ${tier3Price.toFixed(2)} 元/m³</span>
+            <span>阶梯气费: ${(tier3Used * tier3Price).toFixed(2)} 元</span>
+          </div>
+        </div>
+
+        <div class="tier-tip">
+          💡 您目前处于第${currentTier}阶梯，气价${currentTier === 1 ? '最优惠' : currentTier === 2 ? '中等' : '较高'}，请注意节约用气~
+        </div>
+      </div>
+    `;
+  }
+
   _renderCalendar() {
     const daysInMonth = this._getDaysInMonth(this._calYear, this._calMonth);
     const firstDayOfMonth = new Date(this._calYear, this._calMonth - 1, 1).getDay();
@@ -770,6 +939,15 @@ class HFCRGasCard extends LitElement {
     const lastBillUsage = attrs["最近出账用气量"] ?? "-";
     const lastBillAmount = attrs["最近出账金额"] ?? "-";
     const yearlyUsage = attrs["年度出账用气量"] ?? "-";
+    
+    // 获取阶梯气量信息
+    const cumulativeWater = attrs["本年度累计用气量"];
+    const tier1Surplus = attrs["第一阶梯剩余额度"];
+    const tier2Surplus = attrs["第二阶梯剩余额度"];
+    
+    // 检查是否有阶梯气量数据
+    const hasTierData = cumulativeWater !== undefined && cumulativeWater !== null && 
+                        tier1Surplus !== undefined && tier1Surplus !== null;
     return html`
       <ha-card>
         <div class="card-header">
@@ -814,11 +992,20 @@ class HFCRGasCard extends LitElement {
 
         <!-- 日历切换按钮 -->
         <div class="calendar-toggle">
+          ${hasTierData ? html`
+          <div class="calendar-btn ${this._showTierGas ? "active" : ""}" @click=${() => this._toggleTierGas()}>
+            <ha-icon icon="mdi:gas-cylinder" style="--mdi-icon-size:18px;"></ha-icon>
+            ${this._showTierGas ? "收起阶梯" : "用气阶梯"}
+          </div>
+          ` : ""}
           <div class="calendar-btn ${this._showCalendar ? "active" : ""}" @click=${() => this._toggleCalendar()}>
             <ha-icon icon="mdi:calendar-month" style="--mdi-icon-size:18px;"></ha-icon>
             ${this._showCalendar ? "收起日历" : "用气日历"}
           </div>
         </div>
+
+        <!-- 阶梯气量面板 -->
+        ${this._showTierGas && hasTierData ? this._renderTierGas(cumulativeWater, tier1Surplus, tier2Surplus) : ""}
 
         <!-- 日历面板 -->
         ${this._showCalendar ? this._renderCalendar() : ""}
