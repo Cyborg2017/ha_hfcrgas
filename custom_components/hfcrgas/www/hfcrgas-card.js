@@ -37,7 +37,7 @@ class HFCRGasCardEditor extends LitElement {
     if (!this.hass) return html``;
 
     const entities = Object.keys(this.hass.states).filter(
-      (e) => e.startsWith("sensor.hfcrgas_") && e.includes("daily_gas_usage_30d")
+      (e) => e.startsWith("sensor.hfcrgas_") && e.includes("daily_gas_usage_3m")
     );
 
     return html`
@@ -66,7 +66,7 @@ class HFCRGasCardEditor extends LitElement {
           <input
             type="number"
             @change=${this._valueChanged}
-            .value=${this.config.days || 30}
+            .value=${this.config.days || 90}
             name="days"
             min="7"
             max="90"
@@ -80,7 +80,7 @@ class HFCRGasCardEditor extends LitElement {
     if (!this.config) return;
     const name = e.target.name;
     let value = e.target.value;
-    if (name === "days") value = parseInt(value, 10) || 30;
+    if (name === "days") value = parseInt(value, 10) || 90;
     this.config = { ...this.config, [name]: value };
     this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this.config } }));
   }
@@ -481,7 +481,7 @@ class HFCRGasCard extends LitElement {
       type: "custom:hfcrgas-card",
       entity: "",
       title: "合燃华润燃气",
-      days: 30,
+      days: 90,
     };
   }
 
@@ -489,7 +489,7 @@ class HFCRGasCard extends LitElement {
     if (!config.entity) {
       throw new Error("请指定实体");
     }
-    this.config = { title: "合燃华润燃气", days: 30, ...config };
+    this.config = { title: "合燃华润燃气", days: 90, ...config };
   }
 
   getCardSize() {
@@ -523,6 +523,11 @@ class HFCRGasCard extends LitElement {
         this._lastDaylistHash = hash;
         this._renderChart();
       }
+    }
+    const monthKey = `${this._calYear}-${this._calMonth}`;
+    if (monthKey !== this._lastChartMonth) {
+      this._lastChartMonth = monthKey;
+      this._renderChart();
     }
   }
 
@@ -567,19 +572,12 @@ class HFCRGasCard extends LitElement {
     }
 
     const daylist = entityState.attributes.daylist || [];
-    const days = this.config.days || 30;
-    const displayData = daylist.slice(-days);
+    const monthStr = `${this._calYear}-${this._calMonth.toString().padStart(2, "0")}`;
+    const displayData = daylist.filter(item => item.day && item.day.startsWith(monthStr));
 
     if (displayData.length === 0) return;
 
-    const categories = displayData.map((d, i) => {
-      const parts = d.day.split("-");
-      const isFirst = i === 0;
-      const isLast = i === displayData.length - 1;
-      const isEvery5th = i % 5 === 0;
-      return (isFirst || isLast || isEvery5th) ? `${parts[1]}/${parts[2]}` : "";
-    });
-    const fullDates = displayData.map((d) => d.day);
+    const categories = displayData.map((d) => d.day.split("-")[2]);
     const usageData = displayData.map((d) => d.gasUsage || 0);
 
     const isDark = this.config.theme === "off" ||
@@ -929,7 +927,6 @@ class HFCRGasCard extends LitElement {
 
     const attrs = entityState.attributes || {};
     const daylist = attrs.daylist || [];
-    const days = this.config.days || 30;
 
     const balance = attrs["余额"] ?? "-";
     const monthlyUsage = attrs["本月用气量"] ?? "-";
@@ -985,7 +982,7 @@ class HFCRGasCard extends LitElement {
         <div class="chart-section">
           <div class="chart-title">
             <ha-icon icon="mdi:chart-bar"></ha-icon>
-            近${days}天用气量
+            ${this._calYear}年${this._calMonth}月用气量
           </div>
           <div id="gas-chart-container"></div>
         </div>
@@ -1036,7 +1033,7 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "hfcrgas-card",
   name: "合燃华润燃气卡片",
-  description: "显示30天燃气用量图表和用气日历的卡片",
+  description: "显示近3个月燃气用量图表和用气日历的卡片",
   documentationURL: "https://github.com/Cyborg2017/ha_hfcrgas",
 });
 

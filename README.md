@@ -21,7 +21,7 @@
 - 第二阶梯剩余额度
 - 最近缴费金额
 - 下次轮询时间
-- 30天用气量及趋势
+- 近3个月用气量及趋势
 - 每天 07:30 自动轮询数据
 - Session 过期自动重新绑定
 
@@ -71,11 +71,11 @@
 | 第二阶梯剩余额度 | 第二阶梯剩余可用气量 | m³ |
 | 最近缴费金额 | 最近一次缴费金额 | CNY |
 | 下次轮询时间 | 下次数据更新时间 | - |
-| 30天用气量 | 最近30天总用气量 | m³ |
+| 近3个月用气量 | 最近3个月总用气量 | m³ |
 
 ## 前端卡片
 
-集成自带 `hfcrgas-card` 自定义卡片，可直观展示 30 天用气趋势及账户信息。
+集成自带 `hfcrgas-card` 自定义卡片，可直观展示近3个月用气趋势及账户信息。
 
 ![卡片展示1](images/3.png)
 
@@ -89,12 +89,12 @@
 
 ```yaml
 type: custom:hfcrgas-card
-entity: sensor.hfcrgas_1234567890_daily_gas_usage_30d
+entity: sensor.hfcrgas_1234567890_daily_gas_usage_3m
 title: 合燃华润燃气
-days: 30
+days: 90
 ```
 
-> 注意：请将 `sensor.hfcrgas_1234567890_daily_gas_usage_30d` 替换为你实际的 30天用气量传感器实体 ID。
+> 注意：请将 `sensor.hfcrgas_1234567890_daily_gas_usage_3m` 替换为你实际的 近3个月用气量传感器实体 ID。
 
 ## 注意事项
 

@@ -795,14 +795,14 @@ class HFCRGasAPI:
             meter_reading, balance, current_period_usage, arrears_amount, tier_info.get("current_tier", 1)
         )
 
-        # 处理30天日用量结构化数据（供前端卡片使用）
-        daily_30d = []
+        # 处理近3个月日用量结构化数据（供前端卡片使用）
+        daily_3m = []
         if daily_data and isinstance(daily_data, dict):
             yql = daily_data.get("YQL", [])
             biao_ji_shus = daily_data.get("biaoJiShus", [])
             ri_qi = daily_data.get("riQi", [])
-            # 取最近30天
-            start_idx = max(0, len(yql) - 30)
+            # 取最近90天（约3个月）
+            start_idx = max(0, len(yql) - 90)
             for i in range(start_idx, len(yql)):
                 date_str = ri_qi[i][:10] if i < len(ri_qi) else ""
                 try:
@@ -813,15 +813,15 @@ class HFCRGasAPI:
                     reading = float(biao_ji_shus[i]) if i < len(biao_ji_shus) else 0.0
                 except (ValueError, IndexError):
                     reading = 0.0
-                daily_30d.append({
+                daily_3m.append({
                     "day": date_str,
                     "gasUsage": round(usage, 2),
                     "meterReading": round(reading, 2),
                 })
 
-        # 计算30天汇总
-        total_30d = round(sum(d.get("gasUsage", 0) for d in daily_30d), 2)
-        avg_30d = round(total_30d / len(daily_30d), 2) if daily_30d else 0.0
+        # 计算近3个月汇总
+        total_3m = round(sum(d.get("gasUsage", 0) for d in daily_3m), 2)
+        avg_3m = round(total_3m / len(daily_3m), 2) if daily_3m else 0.0
 
         return {
             "user_info": user_info,
@@ -856,9 +856,9 @@ class HFCRGasAPI:
             "last_payment_date": last_payment.get("date"),
             "daily_data": daily_data,
             "bill_data": bill_data,
-            "daily_30d": daily_30d,
-            "total_30d": total_30d,
-            "avg_30d": avg_30d,
+            "daily_3m": daily_3m,
+            "total_3m": total_3m,
+            "avg_3m": avg_3m,
         }
 
 

@@ -158,12 +158,12 @@ SENSOR_DESCRIPTIONS: list[HFCRGasSensorEntityDescription] = [
         ),
     ),
     HFCRGasSensorEntityDescription(
-        key="daily_gas_usage_30d",
-        translation_key="daily_gas_usage_30d",
+        key="daily_gas_usage_3m",
+        translation_key="daily_gas_usage_3m",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
         icon="mdi:chart-bar",
-        value_fn=lambda data: data.get("total_30d"),
+        value_fn=lambda data: data.get("total_3m"),
     ),
 ]
 
@@ -295,12 +295,12 @@ class HFCRGasSensorEntity(CoordinatorEntity[HFCRGasCoordinator], SensorEntity):
         elif self.entity_description.key == "last_payment_amount":
             attrs["缴费日期"] = data.get("last_payment_date")
 
-        elif self.entity_description.key == "daily_gas_usage_30d":
-            daily_30d = data.get("daily_30d", [])
-            if daily_30d:
-                attrs["daylist"] = daily_30d
-                attrs["30天总用气量"] = data.get("total_30d", 0)
-                attrs["30天日均用气量"] = data.get("avg_30d", 0)
+        elif self.entity_description.key == "daily_gas_usage_3m":
+            daily_3m = data.get("daily_3m", [])
+            if daily_3m:
+                attrs["daylist"] = daily_3m
+                attrs["近3个月总用气量"] = data.get("total_3m", 0)
+                attrs["近3个月日均用气量"] = data.get("avg_3m", 0)
                 attrs["用户名"] = data.get("user_name")
                 attrs["地址"] = data.get("address")
                 attrs["户号"] = data.get("huhao")
