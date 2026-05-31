@@ -458,6 +458,13 @@ class HFCRGasCard extends LitElement {
         font-size: 12px;
         color: #E65100;
       }
+      #gas-chart-container .apexcharts-datalabels,
+      #gas-chart-container .apexcharts-datalabel,
+      #gas-chart-container [class*="datalabel"] {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+      }
     `;
   }
 
@@ -466,6 +473,8 @@ class HFCRGasCard extends LitElement {
     this._chart = null;
     this._resizeObserver = null;
     this._lastDaylistHash = null;
+    this._lastChartMonth = null;
+    this._selectedBarIndex = -1;
     this._showCalendar = false;
     this._showTierGas = false;
     this._calYear = new Date().getFullYear();
@@ -507,6 +516,9 @@ class HFCRGasCard extends LitElement {
       this._chart.destroy();
       this._chart = null;
     }
+    const container = this.shadowRoot?.querySelector("#gas-chart-container");
+    const oldLabel = container?.querySelector(".bar-label");
+    if (oldLabel) oldLabel.remove();
     if (this._resizeObserver) {
       this._resizeObserver.disconnect();
       this._resizeObserver = null;
@@ -527,6 +539,7 @@ class HFCRGasCard extends LitElement {
     const monthKey = `${this._calYear}-${this._calMonth}`;
     if (monthKey !== this._lastChartMonth) {
       this._lastChartMonth = monthKey;
+      this._selectedBarIndex = -1;
       this._renderChart();
     }
   }
@@ -570,15 +583,32 @@ class HFCRGasCard extends LitElement {
       this._chart.destroy();
       this._chart = null;
     }
+    const oldLabel = container?.querySelector(".bar-label");
+    if (oldLabel) oldLabel.remove();
 
     const daylist = entityState.attributes.daylist || [];
     const monthStr = `${this._calYear}-${this._calMonth.toString().padStart(2, "0")}`;
-    const displayData = daylist.filter(item => item.day && item.day.startsWith(monthStr));
-
-    if (displayData.length === 0) return;
+    const daysInMonth = new Date(this._calYear, this._calMonth, 0).getDate();
+    const existingData = {};
+    daylist.filter(item => item.day && item.day.startsWith(monthStr)).forEach(item => {
+      const d = parseInt(item.day.split("-")[2], 10);
+      existingData[d] = item;
+    });
+    const displayData = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      if (existingData[d]) {
+        displayData.push(existingData[d]);
+      } else {
+        displayData.push({
+          day: `${monthStr}-${d.toString().padStart(2, "0")}`,
+          gasUsage: 0,
+        });
+      }
+    }
 
     const categories = displayData.map((d) => d.day.split("-")[2]);
     const usageData = displayData.map((d) => d.gasUsage || 0);
+    this._chartDisplayData = displayData;
 
     const isDark = this.config.theme === "off" ||
       (document.querySelector("home-assistant")?.defaultView?.panel ||
@@ -595,6 +625,13 @@ class HFCRGasCard extends LitElement {
         toolbar: { show: false },
         animations: { enabled: true, speed: 400 },
         fontFamily: "inherit",
+        events: {
+          dataPointSelection: (event, chartContext, opts) => {
+            const idx = this._selectedBarIndex === opts.dataPointIndex ? -1 : opts.dataPointIndex;
+            this._selectedBarIndex = idx;
+            this._showBarLabel(idx);
+          },
+        },
       },
       series: [
         {
@@ -602,6 +639,7 @@ class HFCRGasCard extends LitElement {
           data: usageData,
         },
       ],
+      dataLabels: { enabled: false },
       plotOptions: {
         bar: {
           borderRadius: 3,
@@ -613,9 +651,9 @@ class HFCRGasCard extends LitElement {
               { from: 1.0, to: Infinity, color: "#FF6D00" },
             ],
           },
+          dataLabels: { enabled: false },
         },
       },
-      dataLabels: { enabled: false },
       xaxis: {
         categories: categories,
         labels: {
@@ -643,28 +681,50 @@ class HFCRGasCard extends LitElement {
         padding: { left: 4, right: 4, top: 0, bottom: 0 },
       },
       tooltip: {
-        theme: isDark ? "dark" : "light",
-        custom: ({ series, seriesIndex, dataPointIndex, w }) => {
-          const val = series[seriesIndex][dataPointIndex];
-          const date = fullDates[dataPointIndex] || "";
-          return `<div style="
-            padding: 8px 12px;
-            background: ${isDark ? "#333" : "#fff"};
-            color: ${isDark ? "#eee" : "#333"};
-            border-radius: 6px;
-            font-size: 13px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-          ">
-            <div style="font-weight:500;margin-bottom:4px;">${date}</div>
-            <div><span style="color:#FF6D00;font-weight:bold;">${val.toFixed(2)}</span> m³</div>
-          </div>`;
-        },
+        enabled: false,
       },
       theme: { mode: isDark ? "dark" : "light" },
+      dataLabels: { enabled: false },
     };
 
     this._chart = new window.ApexCharts(container, options);
     this._chart.render();
+    container.querySelectorAll(".apexcharts-datalabel, .apexcharts-data-labels, [class*='datalabel']").forEach(el => { el.style.display = "none"; });
+  }
+
+  _showBarLabel(idx) {
+    const container = this.shadowRoot?.querySelector("#gas-chart-container");
+    if (!container) return;
+    let labelEl = container.querySelector(".bar-label");
+    if (labelEl) labelEl.remove();
+    if (idx < 0 || !this._chartDisplayData || !this._chartDisplayData[idx]) return;
+    const d = this._chartDisplayData[idx];
+    const isDark = this.config.theme === "off" ||
+      (document.querySelector("home-assistant")?.defaultView?.panel ||
+       document.querySelector("home-assistant"))?.__hass?.themes?.darkMode;
+    labelEl = document.createElement("div");
+    labelEl.className = "bar-label";
+    labelEl.style.cssText = `
+      position: absolute;
+      left: 50%;
+      top: -4px;
+      transform: translateX(-50%);
+      padding: 5px 14px;
+      background: ${isDark ? "#333" : "#fff"};
+      color: ${isDark ? "#eee" : "#333"};
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: bold;
+      white-space: nowrap;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      pointer-events: none;
+      z-index: 10;
+      text-align: center;
+      line-height: 1.4;
+    `;
+    labelEl.innerHTML = `<div style="font-size:11px;color:#888">${d.day}</div><div style="color:#FF6D00">${d.gasUsage.toFixed(2)} m³</div>`;
+    container.style.position = "relative";
+    container.appendChild(labelEl);
   }
 
   /* ===== 日历功能 ===== */
