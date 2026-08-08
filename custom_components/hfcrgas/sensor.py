@@ -124,7 +124,6 @@ SENSOR_DESCRIPTIONS: list[HFCRGasSensorEntityDescription] = [
     HFCRGasSensorEntityDescription(
         key="tier1_surplus",
         translation_key="tier1_surplus",
-        device_class=SensorDeviceClass.GAS,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
         icon="mdi:numeric-1-box-multiple",
@@ -133,7 +132,6 @@ SENSOR_DESCRIPTIONS: list[HFCRGasSensorEntityDescription] = [
     HFCRGasSensorEntityDescription(
         key="tier2_surplus",
         translation_key="tier2_surplus",
-        device_class=SensorDeviceClass.GAS,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
         icon="mdi:numeric-2-box-multiple",
