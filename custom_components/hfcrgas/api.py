@@ -503,12 +503,16 @@ class HFCRGasAPI:
         _LOGGER.info("表信息初始化完成: rqb_gh=%s, rqb_id=%s, meter_type=%s",
                      self.rqb_gh, self.rqb_id, self.meter_type)
 
-    async def get_daily_usage(self, days: int = 90) -> dict[str, Any]:
-        """获取每日用气量数据."""
+    async def get_daily_usage(self, days: int = 365) -> dict[str, Any]:
+        """获取每日用气量数据.
+
+        服务端会过滤掉 bgnDate 之后前两天内的记录（官方小程序同样提前 2 天），
+        因此这里把 bgnDate 额外提前 2 天；跨度取一年，尽量拿到更多历史数据。
+        """
         await self._ensure_session_valid()
 
         today = datetime.now()
-        start_date = today - timedelta(days=days)
+        start_date = today - timedelta(days=days + 2)
 
         data: dict[str, Any] = {
             "yhh": self.encrypted_yhh,
@@ -519,14 +523,16 @@ class HFCRGasAPI:
             "resourceIdentifier": self.resource_identifier,
         }
 
-        _LOGGER.info("getWlwDay请求参数: rqbGh=%s, rqbId=%s",
-                     self.rqb_gh, self.rqb_id)
-
         result = await self._request_with_retry("/query/getWlwDay", data)
-        _LOGGER.info("getWlwDay响应status=%s, data keys=%s",
-                     result.get("status"),
-                     list(result.get("data", {}).keys()) if isinstance(result.get("data"), dict) else "non-dict")
-        return result.get("data") or {}
+        payload = result.get("data") or {}
+        yql = payload.get("YQL", []) or []
+        dates = payload.get("riQi", []) or []
+        _LOGGER.info("getWlwDay %s~%s 返回 %d 条, %s ~ %s",
+                     start_date.strftime("%Y%m%d"), today.strftime("%Y%m%d"),
+                     len(yql),
+                     str(dates[0])[:10] if dates else "-",
+                     str(dates[-1])[:10] if dates else "-")
+        return payload
 
     async def get_bill_list(self, months: int = 12) -> dict[str, Any]:
         """获取账单列表."""
@@ -731,22 +737,18 @@ class HFCRGasAPI:
                 except (ValueError, IndexError):
                     pass
 
-            # 按月累计用气量
+            # 按月累计用气量（riQi 为次日凌晨抄表时间，需减 1 天归属到实际用气日）
             if yql and ri_qi:
-                try:
-                    latest_date_str = ri_qi[-1]
-                    latest_date = datetime.strptime(latest_date_str.split()[0], "%Y-%m-%d")
-                    current_month = (latest_date.year, latest_date.month)
-                    for i, date_str in enumerate(ri_qi):
-                        try:
-                            d = datetime.strptime(date_str.split()[0], "%Y-%m-%d")
-                            if (d.year, d.month) == current_month and i < len(yql):
-                                monthly_usage += float(yql[i])
-                        except (ValueError, IndexError):
-                            continue
-                    monthly_usage = round(monthly_usage, 2)
-                except (ValueError, IndexError):
-                    pass
+                today = datetime.now()
+                current_month = (today.year, today.month)
+                for i, date_str in enumerate(ri_qi):
+                    try:
+                        d = datetime.strptime(date_str.split()[0], "%Y-%m-%d") - timedelta(days=1)
+                        if (d.year, d.month) == current_month and i < len(yql):
+                            monthly_usage += float(yql[i])
+                    except (ValueError, IndexError):
+                        continue
+                monthly_usage = round(monthly_usage, 2)
 
         # 如果日用量中没有 meter_reading，尝试从 biaoJiShus 获取
         if not meter_reading and daily_data:
@@ -795,16 +797,22 @@ class HFCRGasAPI:
             meter_reading, balance, current_period_usage, arrears_amount, tier_info.get("current_tier", 1)
         )
 
-        # 处理近3个月日用量结构化数据（供前端卡片使用）
-        daily_3m = []
+        # 处理日用量结构化数据（供前端卡片使用）
+        daily_all = []
         if daily_data and isinstance(daily_data, dict):
             yql = daily_data.get("YQL", [])
             biao_ji_shus = daily_data.get("biaoJiShus", [])
             ri_qi = daily_data.get("riQi", [])
-            # 取最近90天（约3个月）
-            start_idx = max(0, len(yql) - 90)
-            for i in range(start_idx, len(yql)):
-                date_str = ri_qi[i][:10] if i < len(ri_qi) else ""
+            # 保留服务端返回的全部日数据，便于回溯历史月份
+            for i in range(len(yql)):
+                date_str = (ri_qi[i] or "")[:10] if i < len(ri_qi) else ""
+                if not date_str:
+                    continue
+                # 抄表时间在次日凌晨，用气量实际属于前一天
+                try:
+                    day = (datetime.strptime(date_str, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+                except ValueError:
+                    continue
                 try:
                     usage = float(yql[i]) if yql[i] else 0.0
                 except (ValueError, IndexError):
@@ -813,15 +821,22 @@ class HFCRGasAPI:
                     reading = float(biao_ji_shus[i]) if i < len(biao_ji_shus) else 0.0
                 except (ValueError, IndexError):
                     reading = 0.0
-                daily_3m.append({
-                    "day": date_str,
+                daily_all.append({
+                    "day": day,
                     "gasUsage": round(usage, 2),
                     "meterReading": round(reading, 2),
                 })
 
-        # 计算近3个月汇总
-        total_3m = round(sum(d.get("gasUsage", 0) for d in daily_3m), 2)
+        # 近3个月 / 近12个月分别取不同区间
+        cutoff_3m = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
+        cutoff_12m = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+        daily_3m = [d for d in daily_all if d["day"] >= cutoff_3m]
+        daily_12m = [d for d in daily_all if d["day"] >= cutoff_12m]
+
+        total_3m = round(sum(d["gasUsage"] for d in daily_3m), 2)
         avg_3m = round(total_3m / len(daily_3m), 2) if daily_3m else 0.0
+        total_12m = round(sum(d["gasUsage"] for d in daily_12m), 2)
+        avg_12m = round(total_12m / len(daily_12m), 2) if daily_12m else 0.0
 
         return {
             "user_info": user_info,
@@ -857,8 +872,11 @@ class HFCRGasAPI:
             "daily_data": daily_data,
             "bill_data": bill_data,
             "daily_3m": daily_3m,
+            "daily_12m": daily_12m,
             "total_3m": total_3m,
             "avg_3m": avg_3m,
+            "total_12m": total_12m,
+            "avg_12m": avg_12m,
         }
 
 
