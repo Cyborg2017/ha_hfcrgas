@@ -367,6 +367,41 @@ class HFCRGasCard extends LitElement {
         border: none;
         min-height: 0;
       }
+      .cal-day {
+        transition: background 0.15s, transform 0.15s;
+      }
+      .cal-day:hover {
+        transform: translateY(-1px);
+      }
+      .cal-day.today {
+        box-shadow: inset 0 0 0 1.5px #FF6D00;
+        border-radius: 6px;
+      }
+      .cal-day.today .cal-day-num {
+        color: #FF6D00;
+      }
+      .cal-day.weekend {
+        background: var(--secondary-background-color, rgba(0,0,0,0.03));
+      }
+      .cal-day.no-usage .cal-day-num {
+        color: var(--secondary-text-color, #999);
+      }
+      .summary-delta {
+        font-size: 9px;
+        line-height: 1.3;
+        margin-top: 1px;
+        color: var(--secondary-text-color, #999);
+        white-space: nowrap;
+      }
+      .summary-item:nth-child(1) .summary-delta { color: #FF6D00; }
+      .summary-item:nth-child(2) .summary-delta { color: #1E88E5; }
+      .summary-item:focus-visible,
+      .info-row:focus-visible,
+      .cal-nav-btn:focus-visible,
+      .calendar-btn:focus-visible {
+        outline: 2px solid var(--primary-color, #03A9F4);
+        outline-offset: -2px;
+      }
       .cal-summary-row {
         grid-column: 1 / -1;
         display: flex;
@@ -1020,14 +1055,34 @@ class HFCRGasCard extends LitElement {
     }
 
     // 每天的数据
+    const today = new Date();
+    const monthUsages = [];
+    for (let i = 1; i <= daysInMonth; i++) {
+      const d = this._getDayData(this._calYear, this._calMonth, i);
+      if (d) monthUsages.push(d.gasUsage || 0);
+    }
+    const maxUsageOfMonth = monthUsages.length ? Math.max(...monthUsages) : 0;
     for (let i = 1; i <= daysInMonth; i++) {
       const dayData = this._getDayData(this._calYear, this._calMonth, i);
       const isMin = minDays.includes(i);
       const isMax = maxDays.includes(i);
-      const dayClass = isMin ? "min-usage" : isMax ? "max-usage" : "";
+      const isToday = this._calYear === today.getFullYear() && this._calMonth === today.getMonth() + 1 && i === today.getDate();
+      const colIndex = (adjustedFirstDay + i - 1) % 7;
+      const dayClass = [
+        isMin ? "min-usage" : isMax ? "max-usage" : "",
+        isToday ? "today" : "",
+        colIndex >= 5 ? "weekend" : "",
+        dayData ? "" : "no-usage",
+      ].filter(Boolean).join(" ");
+      // 用气量热力：越多越浓，最低/最高日沿用原有配色
+      const ratio = maxUsageOfMonth > 0 && dayData ? (dayData.gasUsage || 0) / maxUsageOfMonth : 0;
+      const heatStyle = dayData && !isMin && !isMax && ratio > 0
+        ? `background: rgba(255,109,0,${(0.05 + ratio * 0.2).toFixed(2)})`
+        : "";
+      const titleText = dayData ? `${i}日：${dayData.gasUsage.toFixed(2)} m³` : "";
 
       dayCells.push(html`
-        <div class="cal-day ${dayClass}">
+        <div class="cal-day ${dayClass}" style=${heatStyle} title=${titleText}>
           <div class="cal-day-num">${i}</div>
           ${dayData ? html`
             <div class="cal-day-usage">${dayData.gasUsage.toFixed(2)}m³</div>
