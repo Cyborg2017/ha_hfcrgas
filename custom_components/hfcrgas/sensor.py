@@ -163,6 +163,14 @@ SENSOR_DESCRIPTIONS: list[HFCRGasSensorEntityDescription] = [
         icon="mdi:chart-bar",
         value_fn=lambda data: data.get("total_3m"),
     ),
+    HFCRGasSensorEntityDescription(
+        key="daily_gas_usage_12m",
+        translation_key="daily_gas_usage_12m",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        icon="mdi:calendar-range",
+        value_fn=lambda data: data.get("total_12m"),
+    ),
 ]
 
 
@@ -255,21 +263,10 @@ class HFCRGasSensorEntity(CoordinatorEntity[HFCRGasCoordinator], SensorEntity):
             attrs["是否物联网表"] = "是" if data.get("is_wlw") else "否"
 
         elif self.entity_description.key == "yesterday_gas_usage":
-            daily_data = data.get("daily_data", {})
-            if daily_data and isinstance(daily_data, dict):
-                yql = daily_data.get("YQL", [])
-                ri_qi = daily_data.get("riQi", [])
-                if yql and ri_qi:
-                    recent_days = min(7, len(yql))
-                    for i in range(1, recent_days + 1):
-                        idx = len(yql) - i
-                        if idx >= 0:
-                            date_str = ri_qi[idx][:10] if idx < len(ri_qi) else ""
-                            try:
-                                usage = float(yql[idx])
-                            except (ValueError, IndexError):
-                                usage = 0.0
-                            attrs[date_str] = usage
+            daily_3m = data.get("daily_3m", [])
+            for item in reversed(daily_3m[-7:]):
+                if item.get("day"):
+                    attrs[item["day"]] = item.get("gasUsage", 0)
 
         elif self.entity_description.key == "last_bill_amount":
             attrs["账单月份"] = data.get("last_bill_ym")
@@ -293,12 +290,17 @@ class HFCRGasSensorEntity(CoordinatorEntity[HFCRGasCoordinator], SensorEntity):
         elif self.entity_description.key == "last_payment_amount":
             attrs["缴费日期"] = data.get("last_payment_date")
 
-        elif self.entity_description.key == "daily_gas_usage_3m":
-            daily_3m = data.get("daily_3m", [])
-            if daily_3m:
-                attrs["daylist"] = daily_3m
-                attrs["近3个月总用气量"] = data.get("total_3m", 0)
-                attrs["近3个月日均用气量"] = data.get("avg_3m", 0)
+        elif self.entity_description.key in ("daily_gas_usage_3m", "daily_gas_usage_12m"):
+            is_12m = self.entity_description.key == "daily_gas_usage_12m"
+            daylist = data.get("daily_12m" if is_12m else "daily_3m", [])
+            if daylist:
+                attrs["daylist"] = daylist
+                if is_12m:
+                    attrs["近12个月总用气量"] = data.get("total_12m", 0)
+                    attrs["近12个月日均用气量"] = data.get("avg_12m", 0)
+                else:
+                    attrs["近3个月总用气量"] = data.get("total_3m", 0)
+                    attrs["近3个月日均用气量"] = data.get("avg_3m", 0)
                 attrs["用户名"] = data.get("user_name")
                 attrs["地址"] = data.get("address")
                 attrs["户号"] = data.get("huhao")

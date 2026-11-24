@@ -65,6 +65,9 @@
       },
       "daily_gas_usage_3m": {
         "name": "3-Month Gas Usage"
+      },
+      "daily_gas_usage_12m": {
+        "name": "12-Month Gas Usage"
       }
     }
   }

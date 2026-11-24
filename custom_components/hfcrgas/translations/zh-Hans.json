@@ -65,6 +65,9 @@
       },
       "daily_gas_usage_3m": {
         "name": "近3个月用气量"
+      },
+      "daily_gas_usage_12m": {
+        "name": "近12个月用气量"
       }
     }
   }
