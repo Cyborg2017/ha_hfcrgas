@@ -108,8 +108,8 @@ class HFCRGasCard extends LitElement {
       }
       .card {
         background: var(--card-background-color, #fff);
-        border-radius: var(--border-radius, 12px);
-        box-shadow: var(--box-shadow, 0 2px 8px rgba(0,0,0,0.1));
+        border-radius: var(--ha-card-border-radius, 16px);
+        box-shadow: var(--ha-card-box-shadow, 0 1px 2px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04));
         overflow: hidden;
         font-family: var(--primary-font-family, sans-serif);
         color: var(--primary-text-color, #333);
@@ -118,13 +118,14 @@ class HFCRGasCard extends LitElement {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 16px 20px 12px;
-        border-bottom: 2px solid transparent;
-        border-image: linear-gradient(90deg, #FF6D00, #FF9800, #FFC107, transparent) 1;
+        padding: 18px 20px 14px;
+        background: linear-gradient(160deg, rgba(255,109,0,0.06), rgba(30,136,229,0.03) 55%, transparent);
+        border-bottom: 1px solid var(--divider-color, rgba(0,0,0,0.06));
       }
       .card-title {
-        font-size: 18px;
-        font-weight: bold;
+        font-size: 17px;
+        font-weight: 600;
+        letter-spacing: 0.2px;
         color: var(--primary-text-color);
         display: flex;
         align-items: center;
@@ -145,48 +146,83 @@ class HFCRGasCard extends LitElement {
       .summary-row {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
-        padding: 12px 12px;
-        gap: 8px;
+        padding: 16px;
+        gap: 10px;
       }
       .summary-item {
         text-align: center;
         flex: 1;
-        background: var(--secondary-background-color, rgba(0,0,0,0.03));
-        border-radius: 10px;
-        padding: 10px 4px 8px;
-        transition: transform 0.15s, box-shadow 0.15s;
+        background: var(--ha-card-background, var(--card-background-color, #fff));
+        border: 1px solid var(--divider-color, rgba(0,0,0,0.08));
+        border-radius: 12px;
+        padding: 12px 4px 10px;
+        transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
         cursor: pointer;
       }
+      .summary-item:nth-child(1) .summary-value,
+      .summary-item:nth-child(1) .summary-icon ha-icon { color: #FF6D00; }
+      .summary-item:nth-child(2) .summary-value,
+      .summary-item:nth-child(2) .summary-icon ha-icon { color: #1E88E5; }
+      .summary-item:nth-child(3) .summary-value,
+      .summary-item:nth-child(3) .summary-icon ha-icon { color: #43A047; }
+      .summary-item:nth-child(4) .summary-value,
+      .summary-item:nth-child(4) .summary-icon ha-icon { color: #7E57C2; }
       .summary-item:hover {
         transform: translateY(-2px);
-        box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        border-color: rgba(255,109,0,0.35);
+        box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+      }
+      .summary-item:nth-child(1) {
+        border-color: rgba(255,109,0,0.22);
+        background: linear-gradient(180deg, rgba(255,109,0,0.09), rgba(255,109,0,0.02));
+      }
+      .summary-item:nth-child(2) {
+        border-color: rgba(30,136,229,0.22);
+        background: linear-gradient(180deg, rgba(30,136,229,0.09), rgba(30,136,229,0.02));
+      }
+      .summary-item:nth-child(3) {
+        border-color: rgba(67,160,71,0.22);
+        background: linear-gradient(180deg, rgba(67,160,71,0.09), rgba(67,160,71,0.02));
+      }
+      .summary-item:nth-child(4) {
+        border-color: rgba(126,87,194,0.22);
+        background: linear-gradient(180deg, rgba(126,87,194,0.09), rgba(126,87,194,0.02));
       }
       .summary-icon {
-        margin-bottom: 4px;
+        margin-bottom: 6px;
+        display: flex;
+        justify-content: center;
       }
       .summary-icon ha-icon {
-        --mdi-icon-size: 20px;
-        color: var(--secondary-text-color, #999);
+        --mdi-icon-size: 18px;
+        padding: 5px;
+        border-radius: 50%;
       }
+      .summary-item:nth-child(1) .summary-icon ha-icon { background: rgba(255,109,0,0.15); }
+      .summary-item:nth-child(2) .summary-icon ha-icon { background: rgba(30,136,229,0.15); }
+      .summary-item:nth-child(3) .summary-icon ha-icon { background: rgba(67,160,71,0.15); }
+      .summary-item:nth-child(4) .summary-icon ha-icon { background: rgba(126,87,194,0.15); }
       .summary-value {
-        font-size: 18px;
-        font-weight: bold;
+        font-size: 19px;
+        font-weight: 650;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.2px;
         color: var(--primary-text-color);
-        line-height: 1.3;
+        line-height: 1.25;
       }
       .summary-value.orange { color: #FF6D00; }
       .summary-value.blue { color: #1E88E5; }
       .summary-value.green { color: #43A047; }
       .summary-label {
-        font-size: 10px;
+        font-size: 11px;
         color: var(--secondary-text-color, #999);
-        margin-top: 2px;
-        letter-spacing: 0.3px;
+        margin-top: 3px;
+        letter-spacing: 0.2px;
         line-height: 1.3;
         word-break: keep-all;
       }
       .chart-section {
-        padding: 4px 12px 12px;
+        padding: 4px 16px 16px;
       }
       .chart-title {
         font-size: 13px;
@@ -201,16 +237,43 @@ class HFCRGasCard extends LitElement {
         --mdi-icon-size: 16px;
         color: #FF6D00;
       }
+      .chart-title::before {
+        content: "";
+        width: 3px;
+        height: 13px;
+        border-radius: 2px;
+        background: linear-gradient(180deg, #FF6D00, #FFC107);
+      }
+      .chart-meta {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--secondary-text-color, #999);
+        background: var(--secondary-background-color, rgba(0,0,0,0.04));
+        border: 1px solid var(--divider-color, rgba(0,0,0,0.06));
+        border-radius: 999px;
+        padding: 3px 10px;
+        white-space: nowrap;
+      }
+      .chart-meta b {
+        font-weight: 700;
+      }
+      .chart-meta .total b { color: #FF6D00; }
+      .chart-meta .avg b { color: #29B6F6; }
       #gas-chart-container {
         width: 100%;
         height: 220px;
+        position: relative;
       }
       .info-row {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 9px 20px;
-        border-top: 1px solid var(--divider-color, #eee);
+        padding: 11px 20px;
+        border-top: 1px solid var(--divider-color, rgba(0,0,0,0.06));
         font-size: 13px;
         transition: background 0.15s;
         cursor: pointer;
@@ -231,6 +294,7 @@ class HFCRGasCard extends LitElement {
       .info-value {
         color: var(--primary-text-color);
         font-weight: 500;
+        font-variant-numeric: tabular-nums;
       }
       .no-data {
         text-align: center;
@@ -1284,19 +1348,19 @@ class HFCRGasCard extends LitElement {
         <!-- 日历面板 -->
         ${this._showCalendar ? this._renderCalendar() : ""}
 
-        <div class="info-row" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("last_bill_date"))}>
+        <div class="info-row" role="button" tabindex="0" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("last_bill_date"))} @keydown=${(e) => this._handleKeyActivate(e, "last_bill_date")}>
           <span class="info-label"><ha-icon icon="mdi:calendar-clock"></ha-icon> 最近出账日期</span>
           <span class="info-value">${lastBillDate || "-"}</span>
         </div>
-        <div class="info-row" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("latest_bill_usage"))}>
+        <div class="info-row" role="button" tabindex="0" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("latest_bill_usage"))} @keydown=${(e) => this._handleKeyActivate(e, "latest_bill_usage")}>
           <span class="info-label"><ha-icon icon="mdi:gas-burner"></ha-icon> 最近出账用气量</span>
           <span class="info-value">${typeof lastBillUsage === "number" ? lastBillUsage.toFixed(2) + " m³" : lastBillUsage}</span>
         </div>
-        <div class="info-row" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("yearly_gas_usage"))}>
+        <div class="info-row" role="button" tabindex="0" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("yearly_gas_usage"))} @keydown=${(e) => this._handleKeyActivate(e, "yearly_gas_usage")}>
           <span class="info-label"><ha-icon icon="mdi:chart-box"></ha-icon> 年度出账用气量</span>
           <span class="info-value">${typeof yearlyUsage === "number" ? yearlyUsage.toFixed(2) + " m³" : yearlyUsage}</span>
         </div>
-        <div class="info-row" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("last_bill_amount"))}>
+        <div class="info-row" role="button" tabindex="0" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("last_bill_amount"))} @keydown=${(e) => this._handleKeyActivate(e, "last_bill_amount")}>
           <span class="info-label"><ha-icon icon="mdi:currency-cny"></ha-icon> 最近出账金额</span>
           <span class="info-value">${typeof lastBillAmount === "number" ? lastBillAmount.toFixed(2) + " 元" : lastBillAmount}</span>
         </div>
