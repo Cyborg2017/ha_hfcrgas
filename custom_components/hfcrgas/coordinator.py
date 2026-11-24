@@ -10,6 +10,7 @@ from homeassistant.util import dt as dt_util
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_change
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import HFCRGasAPI, HFCRGasAPIError, HFCRGasAuthError
@@ -38,6 +39,8 @@ class HFCRGasCoordinator(DataUpdateCoordinator[dict]):
         self.api = api
         self.config_entry = entry
         self._next_update: datetime | None = None
+        self._history_store: Store | None = None
+        self._daily_history: dict[str, dict] | None = None
         self._schedule_next_update()
 
     def _schedule_next_update(self) -> None:
@@ -72,6 +75,46 @@ class HFCRGasCoordinator(DataUpdateCoordinator[dict]):
         _LOGGER.info("定时刷新触发: %s", now)
         self.hass.async_create_task(self.async_request_refresh())
 
+    async def _merge_daily_history(self, data: dict) -> None:
+        """把新拉取的日用量并入本地历史，避免旧数据被刷新覆盖."""
+        if self._history_store is None:
+            self._history_store = Store(
+                self.hass, 1, f"{DOMAIN}_{self.api.huhao}_daily_history_v2"
+            )
+        if self._daily_history is None:
+            self._daily_history = await self._history_store.async_load() or {}
+
+        changed = False
+        for item in data.get("daily_12m", []):
+            day = item.get("day")
+            if not day:
+                continue
+            if self._daily_history.get(day) != item:
+                self._daily_history[day] = item
+                changed = True
+
+        if changed:
+            await self._history_store.async_save(self._daily_history)
+            _LOGGER.info("日用量历史已更新: %d 天", len(self._daily_history))
+
+        history = [self._daily_history[d] for d in sorted(self._daily_history)]
+        cutoff_3m = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
+        cutoff_12m = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+        data["daily_3m"] = [d for d in history if d["day"] >= cutoff_3m]
+        data["daily_12m"] = [d for d in history if d["day"] >= cutoff_12m]
+
+        total_3m = round(sum(d["gasUsage"] for d in data["daily_3m"]), 2)
+        data["total_3m"] = total_3m
+        data["avg_3m"] = (
+            round(total_3m / len(data["daily_3m"]), 2) if data["daily_3m"] else 0.0
+        )
+        data["total_12m"] = round(sum(d["gasUsage"] for d in data["daily_12m"]), 2)
+        data["avg_12m"] = (
+            round(data["total_12m"] / len(data["daily_12m"]), 2)
+            if data["daily_12m"]
+            else 0.0
+        )
+
     async def _async_update_data(self) -> dict:
         """从 API 获取最新数据."""
         try:
@@ -81,6 +124,7 @@ class HFCRGasCoordinator(DataUpdateCoordinator[dict]):
                 await self.api.bind()
 
             data = await self.api.get_all_data()
+            await self._merge_daily_history(data)
 
             # 更新下次更新时间
             self._schedule_next_update()
@@ -98,6 +142,7 @@ class HFCRGasCoordinator(DataUpdateCoordinator[dict]):
             try:
                 await self.api.bind()
                 data = await self.api.get_all_data()
+                await self._merge_daily_history(data)
                 self._schedule_next_update()
                 data["next_update_time"] = self._next_update
                 self._update_entry_data()
