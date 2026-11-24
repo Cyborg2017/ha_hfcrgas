@@ -667,8 +667,26 @@ class HFCRGasCard extends LitElement {
       }
     }
 
-    const categories = displayData.map((d) => d.day.split("-")[2]);
+    // 按间隔显示日期，避免整月标签挤在一起
+    const labelStep = daysInMonth > 24 ? 5 : daysInMonth > 15 ? 3 : 2;
+    const lastStepDay = Math.floor(daysInMonth / labelStep) * labelStep;
+    const categories = displayData.map((d, i) => {
+      const dayNum = i + 1;
+      if (dayNum === 1 || dayNum % labelStep === 0) {
+        return d.day.split("-")[2];
+      }
+      // 末尾日期与上一个标签间距足够时才显示，避免出现“3031”这种重叠
+      if (dayNum === daysInMonth && daysInMonth - lastStepDay >= 2) {
+        return d.day.split("-")[2];
+      }
+      return "";
+    });
     const usageData = displayData.map((d) => d.gasUsage || 0);
+    // 当月有实际记录的天数，用于计算日均值
+    const recordedDays = displayData.filter((d, i) => existingData[i + 1]);
+    const avgUsage = recordedDays.length
+      ? recordedDays.reduce((sum, d) => sum + (d.gasUsage || 0), 0) / recordedDays.length
+      : 0;
     this._chartDisplayData = displayData;
 
     const isDark = this.config.theme === "off" ||
@@ -697,14 +715,28 @@ class HFCRGasCard extends LitElement {
       series: [
         {
           name: "用气量(m³)",
+          type: "bar",
           data: usageData,
         },
       ],
+      legend: { show: false },
+      annotations: {
+        yaxis: recordedDays.length
+          ? [
+              {
+                y: avgUsage,
+                borderColor: isDark ? "#00D0FF" : "#0277BD",
+                strokeWidth: 2.5,
+                strokeDashArray: 6,
+              },
+            ]
+          : [],
+      },
       dataLabels: { enabled: false },
       plotOptions: {
         bar: {
-          borderRadius: 3,
-          columnWidth: "60%",
+          borderRadius: 4,
+          columnWidth: "55%",
           colors: {
             ranges: [
               { from: 0.01, to: 0.5, color: "#81C784" },
@@ -786,6 +818,17 @@ class HFCRGasCard extends LitElement {
     labelEl.innerHTML = `<div style="font-size:11px;color:#888">${d.day}</div><div style="color:#FF6D00">${d.gasUsage.toFixed(2)} m³</div>`;
     container.style.position = "relative";
     container.appendChild(labelEl);
+
+    // 气泡跟随柱顶：用 ApexCharts 渲染出的柱子定位，找不到时回退到居中
+    const barRects = container.querySelectorAll('.apexcharts-bar-series .apexcharts-series[rel="1"] rect');
+    const barRect = barRects[idx];
+    if (barRect) {
+      const containerRect = container.getBoundingClientRect();
+      const rect = barRect.getBoundingClientRect();
+      labelEl.style.left = `${rect.left - containerRect.left + rect.width / 2}px`;
+      labelEl.style.top = `${rect.top - containerRect.top - 6}px`;
+      labelEl.style.transform = "translate(-50%, -100%)";
+    }
   }
 
   /* ===== 日历功能 ===== */
@@ -1030,6 +1073,62 @@ class HFCRGasCard extends LitElement {
     `;
   }
 
+  _getMonthStats() {
+    const daylist = this._getDaylistData();
+    const monthStr = `${this._calYear}-${this._calMonth.toString().padStart(2, "0")}`;
+    const items = daylist.filter((item) => item.day && item.day.startsWith(monthStr));
+    const total = items.reduce((sum, item) => sum + (item.gasUsage || 0), 0);
+    return { count: items.length, total, avg: items.length ? total / items.length : 0 };
+  }
+
+  _getSummaryDeltas() {
+    const daylist = this._getDaylistData();
+    if (!daylist.length) return { yesterdayDelta: null, monthDelta: null };
+
+    const byDay = new Map();
+    daylist.forEach((item) => {
+      if (item.day) byDay.set(item.day, item.gasUsage || 0);
+    });
+    const dates = [...byDay.keys()].sort();
+
+    let yesterdayDelta = null;
+    const lastDay = dates[dates.length - 1];
+    const prevDay = dates[dates.length - 2];
+    if (lastDay && prevDay && (new Date(lastDay) - new Date(prevDay)) / 86400000 === 1) {
+      yesterdayDelta = byDay.get(lastDay) - byDay.get(prevDay);
+    }
+
+    const now = new Date();
+    const pad = (n) => n.toString().padStart(2, "0");
+    const curPrefix = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+    const curItems = daylist.filter((item) => item.day && item.day.startsWith(curPrefix));
+    const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevPrefix = `${prevDate.getFullYear()}-${pad(prevDate.getMonth() + 1)}`;
+    const prevItems = daylist.filter((item) => {
+      if (!item.day || !item.day.startsWith(prevPrefix)) return false;
+      return parseInt(item.day.slice(8), 10) <= curItems.length;
+    });
+
+    let monthDelta = null;
+    if (curItems.length && prevItems.length === curItems.length) {
+      const sum = (items) => items.reduce((s, i) => s + (i.gasUsage || 0), 0);
+      monthDelta = sum(curItems) - sum(prevItems);
+    }
+    return { yesterdayDelta, monthDelta };
+  }
+
+  _renderDelta(delta, prefix) {
+    if (delta === null || delta === undefined) return "";
+    const up = delta >= 0;
+    return html`<div class="summary-delta ${up ? "up" : "down"}">${prefix} ${up ? "▲" : "▼"}${Math.abs(delta).toFixed(2)}</div>`;
+  }
+
+  _handleKeyActivate(event, key) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    this._openMoreInfo(this._resolveRelatedEntity(key));
+  }
+
   render() {
     const entityState = this._entityState;
     if (!entityState) {
@@ -1059,6 +1158,8 @@ class HFCRGasCard extends LitElement {
     // 检查是否有阶梯气量数据
     const hasTierData = cumulativeWater !== undefined && cumulativeWater !== null && 
                         tier1Surplus !== undefined && tier1Surplus !== null;
+    const monthStats = this._getMonthStats();
+    const deltas = this._getSummaryDeltas();
     return html`
       <ha-card>
         <div class="card-header">
@@ -1071,24 +1172,26 @@ class HFCRGasCard extends LitElement {
         </div>
 
         <div class="summary-row">
-          <div class="summary-item" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("yesterday_gas_usage"))}>
+          <div class="summary-item" role="button" tabindex="0" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("yesterday_gas_usage"))} @keydown=${(e) => this._handleKeyActivate(e, "yesterday_gas_usage")}>
             <div class="summary-icon"><ha-icon icon="mdi:gas-burner"></ha-icon></div>
             <div class="summary-value orange">${typeof yesterdayUsage === "number" ? yesterdayUsage.toFixed(2) : yesterdayUsage}</div>
+            ${this._renderDelta(deltas.yesterdayDelta, "较前日")}
             <div class="summary-label">昨日用气<br>(m³)</div>
           </div>
-          <div class="summary-item" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("monthly_gas_usage"))}>
+          <div class="summary-item" role="button" tabindex="0" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("monthly_gas_usage"))} @keydown=${(e) => this._handleKeyActivate(e, "monthly_gas_usage")}>
             <div class="summary-icon"><ha-icon icon="mdi:chart-line"></ha-icon></div>
             <div class="summary-value blue">${typeof monthlyUsage === "number" ? monthlyUsage.toFixed(2) : monthlyUsage}</div>
+            ${this._renderDelta(deltas.monthDelta, "较上月")}
             <div class="summary-label">本月用气<br>(m³)</div>
           </div>
-          <div class="summary-item" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("balance"))}>
+          <div class="summary-item" role="button" tabindex="0" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("balance"))} @keydown=${(e) => this._handleKeyActivate(e, "balance")}>
             <div class="summary-icon"><ha-icon icon="mdi:wallet"></ha-icon></div>
             <div class="summary-value green">${typeof balance === "number" ? balance.toFixed(2) : balance}</div>
             <div class="summary-label">账户余额<br>(元)</div>
           </div>
-          <div class="summary-item" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("meter_reading"))}>
+          <div class="summary-item" role="button" tabindex="0" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("meter_reading"))} @keydown=${(e) => this._handleKeyActivate(e, "meter_reading")}>
             <div class="summary-icon"><ha-icon icon="mdi:gauge"></ha-icon></div>
-            <div class="summary-value" style="color:var(--primary-text-color)">${typeof meterReading === "number" ? meterReading.toFixed(2) : meterReading}</div>
+            <div class="summary-value">${typeof meterReading === "number" ? meterReading.toFixed(2) : meterReading}</div>
             <div class="summary-label">气表读数<br>(m³)</div>
           </div>
         </div>
@@ -1096,7 +1199,12 @@ class HFCRGasCard extends LitElement {
         <div class="chart-section">
           <div class="chart-title">
             <ha-icon icon="mdi:chart-bar"></ha-icon>
-            ${this._calYear}年${this._calMonth}月用气量
+            <span>${this._calYear}年${this._calMonth}月用气量</span>
+            <span class="chart-meta">${monthStats.count
+              ? html`<span class="total">合计 <b>${monthStats.total.toFixed(2)}</b> m³</span>
+                  <span>·</span>
+                  <span class="avg">日均 <b>${monthStats.avg.toFixed(2)}</b> m³</span>`
+              : "暂无数据"}</span>
           </div>
           <div id="gas-chart-container"></div>
         </div>
