@@ -69,9 +69,9 @@ async def _register_static_and_js(hass: HomeAssistant) -> None:
     except RuntimeError:
         _LOGGER.debug("静态路径已注册: %s", URL_BASE)
 
-    # 立即注册 add_extra_js_url（确保首次加载就能用）
-    add_extra_js_url(hass, f"{URL_BASE}/{CARD_FILENAME}")
-    _LOGGER.debug("注册前端卡片: %s/%s", URL_BASE, CARD_FILENAME)
+    # 立即注册 add_extra_js_url（确保首次加载就能用，带版本号避免浏览器缓存旧代码）
+    add_extra_js_url(hass, f"{URL_BASE}/{CARD_FILENAME}?v={INTEGRATION_VERSION}")
+    _LOGGER.debug("注册前端卡片: %s/%s?v=%s", URL_BASE, CARD_FILENAME, INTEGRATION_VERSION)
 
 
 async def _register_lovelace_resource(hass: HomeAssistant) -> None:
