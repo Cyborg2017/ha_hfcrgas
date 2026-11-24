@@ -85,7 +85,9 @@ class HFCRGasCardEditor extends LitElement {
     this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: this.config } }));
   }
 }
-customElements.define("hfcrgas-card-editor", HFCRGasCardEditor);
+if (!customElements.get("hfcrgas-card-editor")) {
+  customElements.define("hfcrgas-card-editor", HFCRGasCardEditor);
+}
 
 
 class HFCRGasCard extends LitElement {
@@ -153,6 +155,7 @@ class HFCRGasCard extends LitElement {
         border-radius: 10px;
         padding: 10px 4px 8px;
         transition: transform 0.15s, box-shadow 0.15s;
+        cursor: pointer;
       }
       .summary-item:hover {
         transform: translateY(-2px);
@@ -210,6 +213,7 @@ class HFCRGasCard extends LitElement {
         border-top: 1px solid var(--divider-color, #eee);
         font-size: 13px;
         transition: background 0.15s;
+        cursor: pointer;
       }
       .info-row:hover {
         background: var(--secondary-background-color, rgba(0,0,0,0.02));
@@ -510,6 +514,63 @@ class HFCRGasCard extends LitElement {
     return this.hass.states[this.config.entity];
   }
 
+  /* 实体基础 ID（去掉 _daily_gas_usage_3m / _daily_gas_usage_12m 后缀） */
+  get _baseEntityId() {
+    const entity = this.config?.entity;
+    if (!entity) return null;
+    const match = entity.match(/^(.*?)_(?:daily_)?gas_usage_(3m|12m)$/);
+    return match ? match[1] : null;
+  }
+
+  /* 图表/日历数据：按 config.days 截取最近 N 天 */
+  _getDaylistData() {
+    const daylist = this._entityState?.attributes?.daylist;
+    if (!Array.isArray(daylist) || daylist.length === 0) return [];
+    const days = parseInt(this.config?.days, 10);
+    if (!Number.isFinite(days) || days <= 0) return daylist;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const cutoffStr = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}-${String(cutoff.getDate()).padStart(2, "0")}`;
+    return daylist.filter((item) => item.day && item.day >= cutoffStr);
+  }
+
+  /* 卡片展示属性：以配置实体为主，缺失的摘要信息从同设备 3 个月实体补齐 */
+  _getCardAttrs() {
+    const own = this._entityState?.attributes || {};
+    const base = this._baseEntityId;
+    if (!base) return own;
+    const sibling = this.hass?.states[`${base}_daily_gas_usage_3m`];
+    if (!sibling?.attributes) return own;
+    return {
+      ...sibling.attributes,
+      ...own,
+      daylist: own.daylist ?? sibling.attributes.daylist,
+    };
+  }
+
+  /* 尝试找到与当前实体同设备的对应传感器，找不到则回退到卡片实体 */
+  _resolveRelatedEntity(key) {
+    const fallback = this.config?.entity;
+    if (!this.hass || !fallback) return null;
+    const base = this._baseEntityId;
+    if (base) {
+      const candidate = `${base}_${key}`;
+      if (this.hass.states[candidate]) return candidate;
+    }
+    return fallback;
+  }
+
+  _openMoreInfo(entityId) {
+    if (!entityId) return;
+    this.dispatchEvent(
+      new CustomEvent("hass-more-info", {
+        detail: { entityId },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
   disconnectedCallback() {
     super.disconnectedCallback();
     if (this._chart) {
@@ -586,7 +647,7 @@ class HFCRGasCard extends LitElement {
     const oldLabel = container?.querySelector(".bar-label");
     if (oldLabel) oldLabel.remove();
 
-    const daylist = entityState.attributes.daylist || [];
+    const daylist = this._getDaylistData();
     const monthStr = `${this._calYear}-${this._calMonth.toString().padStart(2, "0")}`;
     const daysInMonth = new Date(this._calYear, this._calMonth, 0).getDate();
     const existingData = {};
@@ -728,12 +789,6 @@ class HFCRGasCard extends LitElement {
   }
 
   /* ===== 日历功能 ===== */
-
-  _getDaylistData() {
-    const entityState = this._entityState;
-    if (!entityState || !entityState.attributes || !entityState.attributes.daylist) return [];
-    return entityState.attributes.daylist;
-  }
 
   _getDaysInMonth(year, month) {
     return new Date(year, month, 0).getDate();
@@ -985,8 +1040,7 @@ class HFCRGasCard extends LitElement {
       `;
     }
 
-    const attrs = entityState.attributes || {};
-    const daylist = attrs.daylist || [];
+    const attrs = this._getCardAttrs();
 
     const balance = attrs["余额"] ?? "-";
     const monthlyUsage = attrs["本月用气量"] ?? "-";
@@ -1017,22 +1071,22 @@ class HFCRGasCard extends LitElement {
         </div>
 
         <div class="summary-row">
-          <div class="summary-item">
+          <div class="summary-item" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("yesterday_gas_usage"))}>
             <div class="summary-icon"><ha-icon icon="mdi:gas-burner"></ha-icon></div>
             <div class="summary-value orange">${typeof yesterdayUsage === "number" ? yesterdayUsage.toFixed(2) : yesterdayUsage}</div>
             <div class="summary-label">昨日用气<br>(m³)</div>
           </div>
-          <div class="summary-item">
+          <div class="summary-item" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("monthly_gas_usage"))}>
             <div class="summary-icon"><ha-icon icon="mdi:chart-line"></ha-icon></div>
             <div class="summary-value blue">${typeof monthlyUsage === "number" ? monthlyUsage.toFixed(2) : monthlyUsage}</div>
             <div class="summary-label">本月用气<br>(m³)</div>
           </div>
-          <div class="summary-item">
+          <div class="summary-item" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("balance"))}>
             <div class="summary-icon"><ha-icon icon="mdi:wallet"></ha-icon></div>
             <div class="summary-value green">${typeof balance === "number" ? balance.toFixed(2) : balance}</div>
             <div class="summary-label">账户余额<br>(元)</div>
           </div>
-          <div class="summary-item">
+          <div class="summary-item" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("meter_reading"))}>
             <div class="summary-icon"><ha-icon icon="mdi:gauge"></ha-icon></div>
             <div class="summary-value" style="color:var(--primary-text-color)">${typeof meterReading === "number" ? meterReading.toFixed(2) : meterReading}</div>
             <div class="summary-label">气表读数<br>(m³)</div>
@@ -1067,19 +1121,19 @@ class HFCRGasCard extends LitElement {
         <!-- 日历面板 -->
         ${this._showCalendar ? this._renderCalendar() : ""}
 
-        <div class="info-row">
+        <div class="info-row" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("last_bill_date"))}>
           <span class="info-label"><ha-icon icon="mdi:calendar-clock"></ha-icon> 最近出账日期</span>
           <span class="info-value">${lastBillDate || "-"}</span>
         </div>
-        <div class="info-row">
+        <div class="info-row" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("latest_bill_usage"))}>
           <span class="info-label"><ha-icon icon="mdi:gas-burner"></ha-icon> 最近出账用气量</span>
           <span class="info-value">${typeof lastBillUsage === "number" ? lastBillUsage.toFixed(2) + " m³" : lastBillUsage}</span>
         </div>
-        <div class="info-row">
+        <div class="info-row" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("yearly_gas_usage"))}>
           <span class="info-label"><ha-icon icon="mdi:chart-box"></ha-icon> 年度出账用气量</span>
           <span class="info-value">${typeof yearlyUsage === "number" ? yearlyUsage.toFixed(2) + " m³" : yearlyUsage}</span>
         </div>
-        <div class="info-row">
+        <div class="info-row" @click=${() => this._openMoreInfo(this._resolveRelatedEntity("last_bill_amount"))}>
           <span class="info-label"><ha-icon icon="mdi:currency-cny"></ha-icon> 最近出账金额</span>
           <span class="info-value">${typeof lastBillAmount === "number" ? lastBillAmount.toFixed(2) + " 元" : lastBillAmount}</span>
         </div>
@@ -1087,13 +1141,15 @@ class HFCRGasCard extends LitElement {
     `;
   }
 }
-customElements.define("hfcrgas-card", HFCRGasCard);
+if (!customElements.get("hfcrgas-card")) {
+  customElements.define("hfcrgas-card", HFCRGasCard);
+}
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "hfcrgas-card",
   name: "合燃华润燃气卡片",
-  description: "显示近3个月燃气用量图表和用气日历的卡片",
+  description: "显示燃气用量趋势、用气日历及账户信息的卡片",
   documentationURL: "https://github.com/Cyborg2017/ha_hfcrgas",
 });
 
